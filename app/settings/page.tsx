@@ -7,7 +7,21 @@ import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
 import { ArrowLeft, Bell, Volume2, Palette, Clock, Shield, HelpCircle, Crown } from "lucide-react"
 import Link from "next/link"
-import Pi from "pi-network-sdk" // Declare the Pi variable
+
+declare global {
+  interface Window {
+    Pi?: any
+  }
+}
+
+const getPi = () => (typeof window !== "undefined" ? window.Pi : null)
+
+function onIncompletePaymentFound(payment: any) {
+  console.log("Incomplete payment found:", payment)
+  const Pi = getPi()
+  if (!Pi) return
+  return Pi.completePayment(payment.identifier)
+}
 
 export default function SettingsPage() {
   const [notifications, setNotifications] = useState(true)
@@ -18,14 +32,15 @@ export default function SettingsPage() {
 
   const handlePiPayment = async () => {
     try {
-      // Check if Pi Network SDK is available
-      if (typeof window !== "undefined" && Pi) {
+      // Check if Pi SDK is available (only works inside Pi Browser)
+      const Pi = getPi()
+      if (Pi) {
         setSubscriptionStatus("pending")
 
         // Initialize Pi SDK
         await Pi.init({
           version: "2.0",
-          sandbox: true, // Set to false for production
+          sandbox: isSandbox, // toggle sandbox/production
         })
 
         // Authenticate user
@@ -75,11 +90,6 @@ export default function SettingsPage() {
     }
   }
 
-  const onIncompletePaymentFound = (payment: any) => {
-    console.log("Incomplete payment found:", payment)
-    // Handle incomplete payment
-    return Pi.completePayment(payment.identifier)
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
