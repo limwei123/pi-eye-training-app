@@ -5,13 +5,35 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Eye, Target, TrendingUp, Play, Settings, Calendar } from "lucide-react"
+import { Eye, Target, TrendingUp, Play, Settings, Calendar, CreditCard } from "lucide-react"
 import Link from "next/link"
 
+declare global {
+  interface Window {
+    Pi?: {
+      createPayment: (
+        paymentData: {
+          amount: number
+          memo: string
+          metadata: Record<string, unknown>
+        },
+        callbacks: {
+          onReadyForServerApproval: (paymentId: string) => void
+          onReadyForServerCompletion: (paymentId: string, txid: string) => void
+          onCancel: (paymentId: string) => void
+          onError: (error: unknown, payment?: unknown) => void
+        }
+      ) => void
+    }
+  }
+}
+
 export default function HomePage() {
-  const [todayProgress, setTodayProgress] = useState(65)
-  const [streak, setStreak] = useState(7)
-  const [totalSessions, setTotalSessions] = useState(42)
+  const [todayProgress] = useState(65)
+  const [streak] = useState(7)
+  const [totalSessions] = useState(42)
+  const [paymentStatus, setPaymentStatus] = useState("")
+  const [isPaying, setIsPaying] = useState(false)
 
   const exerciseCategories = [
     {
@@ -43,10 +65,60 @@ export default function HomePage() {
     },
   ]
 
+  const handleTestPayment = async () => {
+    try {
+      setPaymentStatus("")
+      setIsPaying(true)
+
+      if (typeof window === "undefined" || !window.Pi) {
+        setPaymentStatus("Pi SDK not found. Please open this app in Pi Browser.")
+        setIsPaying(false)
+        return
+      }
+
+      window.Pi.createPayment(
+        {
+          amount: 0.01,
+          memo: "Test payment for Eye Training App",
+          metadata: {
+            type: "test_payment",
+            feature: "premium_eye_training",
+          },
+        },
+        {
+          onReadyForServerApproval: (paymentId: string) => {
+            console.log("Ready for server approval:", paymentId)
+            setPaymentStatus(`Payment created: ${paymentId}`)
+          },
+          onReadyForServerCompletion: (paymentId: string, txid: string) => {
+            console.log("Ready for server completion:", paymentId, txid)
+            setPaymentStatus(`Payment success. Payment ID: ${paymentId}, TXID: ${txid}`)
+            setIsPaying(false)
+          },
+          onCancel: (paymentId: string) => {
+            console.log("Payment cancelled:", paymentId)
+            setPaymentStatus(`Payment cancelled: ${paymentId}`)
+            setIsPaying(false)
+          },
+          onError: (error: unknown) => {
+            console.error("Payment error:", error)
+            const message = error instanceof Error ? error.message : "Unknown payment error"
+            setPaymentStatus(`Payment error: ${message}`)
+            setIsPaying(false)
+          },
+        }
+      )
+    } catch (error) {
+      console.error(error)
+      const message = error instanceof Error ? error.message : "Unknown payment error"
+      setPaymentStatus(`Payment error: ${message}`)
+      setIsPaying(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-md mx-auto space-y-6">
-        {/* Header */}
         <div className="text-center pt-8 pb-4">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Eye className="h-8 w-8 text-blue-600" />
@@ -55,7 +127,34 @@ export default function HomePage() {
           <p className="text-gray-600 text-sm">for Nystagmus</p>
         </div>
 
-        {/* Daily Progress Card */}
+        <Card className="shadow-lg border-2 border-yellow-300">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <CreditCard className="h-5 w-5 text-yellow-600" />
+              Pi Test Payment
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Use this button to test a 0.01 Pi transaction for Pi Developer verification.
+            </p>
+
+            <Button
+              onClick={handleTestPayment}
+              disabled={isPaying}
+              className="w-full h-12"
+            >
+              {isPaying ? "Processing..." : "Pay 0.01 Pi"}
+            </Button>
+
+            {paymentStatus && (
+              <div className="rounded-lg bg-gray-100 p-3 text-sm text-gray-700 break-words">
+                {paymentStatus}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card className="shadow-lg">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -89,7 +188,6 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        {/* Exercise Categories */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold text-gray-900 px-1">Exercise Categories</h2>
 
@@ -124,7 +222,6 @@ export default function HomePage() {
           })}
         </div>
 
-        {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4 pt-4">
           <Link href="/progress">
             <Button variant="outline" className="w-full h-12 flex items-center gap-2 bg-transparent">
@@ -140,7 +237,6 @@ export default function HomePage() {
           </Link>
         </div>
 
-        {/* Bottom spacing for mobile navigation */}
         <div className="h-8"></div>
       </div>
     </div>
