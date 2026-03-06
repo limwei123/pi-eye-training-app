@@ -5,10 +5,7 @@ import { useEffect, useState } from "react"
 declare global {
   interface Window {
     Pi?: {
-      init: (options: {
-        version: string
-        sandbox: boolean
-      }) => void
+      init: (options: { version: string; sandbox: boolean }) => void
       authenticate: (
         scopes: string[],
         onIncompletePaymentFound?: (payment: unknown) => void
@@ -23,88 +20,78 @@ declare global {
   }
 }
 
-type AuthLoadingScreenProps = {
-  onAuthenticated?: (auth: {
-    accessToken: string
-    user: {
-      uid: string
-      username: string
-    }
-  }) => void
+type AuthResult = {
+  accessToken: string
+  user: {
+    uid: string
+    username: string
+  }
 }
 
 export function AuthLoadingScreen({
   onAuthenticated,
-}: AuthLoadingScreenProps) {
+}: {
+  onAuthenticated?: (auth: AuthResult) => void
+}) {
   const [message, setMessage] = useState("Loading Pi SDK...")
   const [error, setError] = useState("")
 
   useEffect(() => {
     let cancelled = false
 
-    const loadPiSdk = async () => {
+    const waitForPi = async () => {
+      for (let i = 0; i < 50; i++) {
+        if (window.Pi) return window.Pi
+        await new Promise((resolve) => setTimeout(resolve, 200))
+      }
+      return null
+    }
+
+    const run = async () => {
       try {
         if (typeof window === "undefined") return
 
+        setMessage("Loading Pi Network SDK...")
+
         if (!window.Pi) {
-          setMessage("Loading Pi Network SDK...")
+          const existing = document.querySelector(
+            'script[src="https://sdk.minepi.com/pi-sdk.js"]'
+          ) as HTMLScriptElement | null
 
-          await new Promise<void>((resolve, reject) => {
-            const existing = document.querySelector(
-              'script[src="https://sdk.minepi.com/pi-sdk.js"]'
-            ) as HTMLScriptElement | null
-
-            if (existing) {
-              if (window.Pi) {
-                resolve()
-                return
-              }
-
-              existing.addEventListener("load", () => resolve(), { once: true })
-              existing.addEventListener(
-                "error",
-                () => reject(new Error("Failed to load Pi SDK")),
-                { once: true }
-              )
-              return
-            }
-
+          if (!existing) {
             const script = document.createElement("script")
             script.src = "https://sdk.minepi.com/pi-sdk.js"
             script.async = true
-            script.onload = () => resolve()
-            script.onerror = () => reject(new Error("Failed to load Pi SDK"))
             document.body.appendChild(script)
-          })
+          }
         }
 
-        if (!window.Pi) {
+        const Pi = await waitForPi()
+
+        if (!Pi) {
           throw new Error("Pi SDK not available")
         }
 
         setMessage("Initializing Pi SDK...")
 
-        window.Pi.init({
+        Pi.init({
           version: "2.0",
           sandbox: true,
         })
 
+        await new Promise((resolve) => setTimeout(resolve, 300))
+
         setMessage("Authenticating with Pi Network...")
 
-        const auth = await window.Pi.authenticate(
-          ["username", "payments"],
-          () => {
-            console.log("Incomplete payment found")
-          }
-        )
+        const auth = await Pi.authenticate(["username", "payments"], () => {
+          console.log("Incomplete payment found")
+        })
 
         if (cancelled) return
 
         setMessage(`Welcome ${auth.user.username}`)
 
-        if (onAuthenticated) {
-          onAuthenticated(auth)
-        }
+        onAuthenticated?.(auth)
       } catch (err) {
         if (cancelled) return
         const msg =
@@ -113,7 +100,7 @@ export function AuthLoadingScreen({
       }
     }
 
-    loadPiSdk()
+    run()
 
     return () => {
       cancelled = true
