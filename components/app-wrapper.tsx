@@ -1,19 +1,22 @@
-"use client";
+"use client"
 
-import type { ReactNode } from "react";
-import { PiAuthProvider, usePiAuth } from "@/contexts/pi-auth-context";
-import { AuthLoadingScreen } from "./auth-loading-screen";
+import { useState } from "react"
+import { AuthLoadingScreen } from "@/components/auth-loading-screen"
 
-function AppContent({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = usePiAuth();
-  if (!isAuthenticated) return <AuthLoadingScreen />;
-  return <>{children}</>;
+type AuthState = {
+  accessToken: string
+  user: {
+    uid: string
+    username: string
+  }
 }
 
-export function AppWrapper({ children }: { children: ReactNode }) {
-  return (
-    <PiAuthProvider>
-      <AppContent>{children}</AppContent>
-    </PiAuthProvider>
-  );
+export function AppWrapper({ children }: { children: React.ReactNode }) {
+  const [auth, setAuth] = useState<AuthState | null>(null)
+
+  if (!auth) {
+    return <AuthLoadingScreen onAuthenticated={setAuth} />
+  }
+
+  return <>{children}</>
 }
