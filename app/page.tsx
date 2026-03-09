@@ -5,7 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Eye, Target, TrendingUp, Play, Settings, Calendar, CreditCard } from "lucide-react"
+import {
+  Eye,
+  Target,
+  TrendingUp,
+  Play,
+  Settings,
+  Calendar,
+  CreditCard,
+} from "lucide-react"
 import Link from "next/link"
 
 declare global {
@@ -65,6 +73,26 @@ export default function HomePage() {
     },
   ]
 
+  const postJson = async (url: string, body: Record<string, unknown>) => {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    })
+
+    const data = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      throw new Error(
+        typeof data?.error === "string" ? data.error : "Request failed"
+      )
+    }
+
+    return data
+  }
+
   const handleTestPayment = async () => {
     try {
       setPaymentStatus("")
@@ -86,31 +114,49 @@ export default function HomePage() {
           },
         },
         {
-          onReadyForServerApproval: (paymentId: string) => {
-            console.log("Ready for server approval:", paymentId)
-            setPaymentStatus(`Payment created: ${paymentId}`)
+          onReadyForServerApproval: async (paymentId: string) => {
+            try {
+              setPaymentStatus(`Approving payment ${paymentId}...`)
+              await postJson("/api/payments/approve", { paymentId })
+              setPaymentStatus(`Payment approved: ${paymentId}`)
+            } catch (error) {
+              const message =
+                error instanceof Error ? error.message : "Approval failed"
+              setPaymentStatus(`Approval error: ${message}`)
+              setIsPaying(false)
+            }
           },
-          onReadyForServerCompletion: (paymentId: string, txid: string) => {
-            console.log("Ready for server completion:", paymentId, txid)
-            setPaymentStatus(`Payment success. Payment ID: ${paymentId}, TXID: ${txid}`)
-            setIsPaying(false)
+
+          onReadyForServerCompletion: async (paymentId: string, txid: string) => {
+            try {
+              setPaymentStatus(`Completing payment ${paymentId}...`)
+              await postJson("/api/payments/complete", { paymentId, txid })
+              setPaymentStatus(`Payment completed successfully. TXID: ${txid}`)
+              setIsPaying(false)
+            } catch (error) {
+              const message =
+                error instanceof Error ? error.message : "Completion failed"
+              setPaymentStatus(`Completion error: ${message}`)
+              setIsPaying(false)
+            }
           },
+
           onCancel: (paymentId: string) => {
-            console.log("Payment cancelled:", paymentId)
             setPaymentStatus(`Payment cancelled: ${paymentId}`)
             setIsPaying(false)
           },
+
           onError: (error: unknown) => {
-            console.error("Payment error:", error)
-            const message = error instanceof Error ? error.message : "Unknown payment error"
+            const message =
+              error instanceof Error ? error.message : "Unknown payment error"
             setPaymentStatus(`Payment error: ${message}`)
             setIsPaying(false)
           },
         }
       )
     } catch (error) {
-      console.error(error)
-      const message = error instanceof Error ? error.message : "Unknown payment error"
+      const message =
+        error instanceof Error ? error.message : "Unknown payment error"
       setPaymentStatus(`Payment error: ${message}`)
       setIsPaying(false)
     }
@@ -136,7 +182,8 @@ export default function HomePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-gray-600">
-              Use this button to test a 0.01 Pi transaction for Pi Developer verification.
+              Use this button to test a 0.01 Pi transaction for Pi Developer
+              verification.
             </p>
 
             <Button
@@ -189,7 +236,9 @@ export default function HomePage() {
         </Card>
 
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-gray-900 px-1">Exercise Categories</h2>
+          <h2 className="text-xl font-semibold text-gray-900 px-1">
+            Exercise Categories
+          </h2>
 
           {exerciseCategories.map((category) => {
             const IconComponent = category.icon
@@ -202,8 +251,12 @@ export default function HomePage() {
                         <IconComponent className="h-6 w-6 text-white" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 mb-1">{category.title}</h3>
-                        <p className="text-sm text-gray-600 mb-2">{category.description}</p>
+                        <h3 className="font-semibold text-gray-900 mb-1">
+                          {category.title}
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-2">
+                          {category.description}
+                        </p>
                         <div className="flex gap-2">
                           <Badge variant="secondary" className="text-xs">
                             {category.exercises} exercises
@@ -224,13 +277,19 @@ export default function HomePage() {
 
         <div className="grid grid-cols-2 gap-4 pt-4">
           <Link href="/progress">
-            <Button variant="outline" className="w-full h-12 flex items-center gap-2 bg-transparent">
+            <Button
+              variant="outline"
+              className="w-full h-12 flex items-center gap-2 bg-transparent"
+            >
               <TrendingUp className="h-4 w-4" />
               View Progress
             </Button>
           </Link>
           <Link href="/settings">
-            <Button variant="outline" className="w-full h-12 flex items-center gap-2 bg-transparent">
+            <Button
+              variant="outline"
+              className="w-full h-12 flex items-center gap-2 bg-transparent"
+            >
               <Settings className="h-4 w-4" />
               Settings
             </Button>
