@@ -76,7 +76,7 @@ export function AuthLoadingScreen({
 
         Pi.init({
           version: "2.0",
-          sandbox: true,
+          sandbox: false,
         })
 
         await new Promise((resolve) => setTimeout(resolve, 300))
